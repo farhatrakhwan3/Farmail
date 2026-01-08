@@ -2,156 +2,148 @@
 <html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
-    <title>Farmail | Secure Cloud</title>
+    <title>Farmail | Dark Cloud</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background-color: #020617; color: #f1f5f9; }
-        .msg-card { transition: 0.2s; border-left: 4px solid transparent; }
-        .msg-card.unread { border-left-color: #3b82f6; background-color: #0f172a; }
-        .msg-card:hover { background-color: #1e293b; }
+        .unread-indicator { border-left: 4px solid #3b82f6; }
+        .modal-bg { background: rgba(0, 0, 0, 0.9); backdrop-filter: blur(8px); }
     </style>
 </head>
 <body class="h-screen overflow-hidden">
 
-    <div id="toast" class="fixed top-5 left-1/2 -translate-x-1/2 z-[100] hidden bg-blue-600 px-6 py-3 rounded-full shadow-2xl font-bold"></div>
+    <div id="notif" class="fixed top-5 left-1/2 -translate-x-1/2 z-[100] hidden bg-blue-600 px-8 py-3 rounded-full font-bold shadow-2xl transition-all"></div>
 
     <div id="auth-ui" class="flex items-center justify-center h-full">
-        <div class="bg-slate-900/50 p-10 rounded-3xl border border-slate-800 w-full max-w-sm backdrop-blur-md">
-            <h1 class="text-4xl font-black text-blue-500 mb-8 text-center tracking-tighter">FARMAIL</h1>
-            <input id="u-name" type="text" placeholder="Username" class="w-full p-4 bg-black border border-slate-800 rounded-xl mb-3 focus:border-blue-500 outline-none">
-            <input id="u-pass" type="password" placeholder="Password" class="w-full p-4 bg-black border border-slate-800 rounded-xl mb-6 focus:border-blue-500 outline-none">
+        <div class="bg-slate-900 border border-slate-800 p-10 rounded-3xl w-full max-w-sm">
+            <h1 class="text-4xl font-black text-blue-500 mb-8 text-center">FARMAIL</h1>
+            <input id="u-user" type="text" placeholder="Username" class="w-full p-4 bg-black border border-slate-800 rounded-xl mb-3 focus:border-blue-500 outline-none">
+            <input id="u-pass" type="password" placeholder="Password" class="w-full p-4 bg-black border border-slate-800 rounded-xl mb-8 focus:border-blue-500 outline-none">
             <button onclick="auth('login')" class="w-full bg-blue-600 hover:bg-blue-700 py-4 rounded-xl font-bold mb-4 transition">Login</button>
-            <button onclick="auth('signup')" class="w-full text-slate-500 text-sm hover:text-white">Create Account</button>
+            <button onclick="auth('signup')" class="w-full text-slate-500 text-sm">Create account</button>
         </div>
     </div>
 
     <div id="app-ui" class="hidden flex h-full">
-        <aside class="w-72 border-r border-slate-800 p-8 flex flex-col">
-            <h2 class="text-2xl font-black text-blue-500 mb-12">FARMAIL</h2>
-            <div class="mb-10 bg-slate-900/80 p-5 rounded-2xl border border-slate-800">
-                <p class="text-[10px] text-slate-500 font-bold uppercase mb-1">User</p>
-                <p id="current-user" class="text-xs text-blue-300 font-mono truncate"></p>
+        <aside class="w-72 border-r border-slate-800 p-8 flex flex-col bg-slate-950">
+            <h2 class="text-2xl font-black text-blue-500 mb-10">FARMAIL</h2>
+            <div class="mb-10 p-4 bg-slate-900 rounded-2xl border border-slate-800">
+                <p class="text-[10px] text-slate-500 font-bold uppercase mb-1">Signed in</p>
+                <p id="user-tag" class="text-xs text-blue-300 font-mono truncate"></p>
             </div>
-            <button onclick="document.getElementById('c-modal').classList.remove('hidden')" class="bg-blue-600 py-4 rounded-2xl font-bold mb-4 hover:bg-blue-500 transition shadow-lg shadow-blue-500/20">Compose</button>
-            <button onclick="logout()" class="text-slate-600 hover:text-red-400 mt-auto text-sm">Sign Out</button>
+            <button onclick="openCompose()" class="bg-blue-600 py-4 rounded-2xl font-bold mb-4 hover:scale-105 transition">Compose</button>
+            <button onclick="logout()" class="text-slate-600 hover:text-red-500 mt-auto text-sm">Sign Out</button>
         </aside>
 
         <main class="flex-1 flex flex-col">
             <header class="h-20 border-b border-slate-800 flex items-center px-10 justify-between">
                 <h3 class="font-bold text-xl">Inbox</h3>
-                <span class="flex items-center gap-2 text-[10px] font-bold text-green-500">
-                    <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span> LIVE
+                <span class="text-[10px] text-green-500 font-bold flex items-center gap-2">
+                    <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span> FAST SYNC ACTIVE
                 </span>
             </header>
-            <div id="msg-list" class="flex-1 overflow-y-auto p-10 space-y-4"></div>
+            <div id="msg-container" class="flex-1 overflow-y-auto p-10 space-y-4"></div>
         </main>
     </div>
 
-    <div id="v-modal" class="hidden fixed inset-0 bg-black/95 backdrop-blur-sm flex items-center justify-center z-50 p-6">
-        <div class="bg-slate-900 border border-slate-800 p-10 rounded-3xl w-full max-w-3xl">
-            <div id="v-content"></div>
-            <button onclick="document.getElementById('v-modal').classList.add('hidden')" class="mt-10 bg-slate-800 px-10 py-3 rounded-xl font-bold hover:bg-slate-700">Close</button>
+    <div id="v-modal" class="hidden fixed inset-0 modal-bg flex items-center justify-center z-50 p-6">
+        <div class="bg-slate-900 border border-slate-800 p-10 rounded-3xl w-full max-w-2xl">
+            <div id="v-body"></div>
+            <button onclick="closeView()" class="mt-8 bg-slate-800 px-8 py-2 rounded-xl text-sm font-bold">Back</button>
         </div>
     </div>
 
-    <div id="c-modal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
-        <form id="compose-form" class="bg-slate-900 border border-slate-800 p-10 rounded-3xl w-full max-w-xl">
-            <h2 class="text-2xl font-bold mb-8">New Message</h2>
-            <input name="to" type="text" placeholder="To: (e.g. alex@farmail.com)" class="w-full p-4 mb-4 bg-black border border-slate-800 rounded-xl outline-none focus:border-blue-500" required>
-            <input name="subject" type="text" placeholder="Subject" class="w-full p-4 mb-4 bg-black border border-slate-800 rounded-xl outline-none focus:border-blue-500" required>
-            <textarea name="body" rows="6" placeholder="Your message..." class="w-full p-4 mb-6 bg-black border border-slate-800 rounded-xl outline-none focus:border-blue-500" required></textarea>
-            
-            <div class="mb-8 p-4 border-2 border-dashed border-slate-800 rounded-2xl bg-black/30">
-                <input type="file" name="file" class="text-xs text-slate-500">
-            </div>
-
+    <div id="c-modal" class="hidden fixed inset-0 modal-bg flex items-center justify-center z-50 p-4">
+        <form id="c-form" class="bg-slate-900 border border-slate-800 p-10 rounded-3xl w-full max-w-xl">
+            <h2 class="text-2xl font-bold mb-6 text-blue-500">New Message</h2>
+            <input name="to" type="text" placeholder="Recipient" class="w-full p-4 mb-4 bg-black border border-slate-800 rounded-xl outline-none" required>
+            <input name="subject" type="text" placeholder="Subject" class="w-full p-4 mb-4 bg-black border border-slate-800 rounded-xl outline-none" required>
+            <textarea name="body" rows="6" placeholder="Write here..." class="w-full p-4 mb-6 bg-black border border-slate-800 rounded-xl outline-none" required></textarea>
+            <input type="file" name="file" class="mb-8 text-xs text-slate-500">
             <div class="flex justify-end gap-4">
-                <button type="button" onclick="document.getElementById('c-modal').classList.add('hidden')" class="px-6 text-slate-500">Cancel</button>
-                <button type="submit" class="bg-blue-600 px-10 py-3 rounded-xl font-bold hover:bg-blue-500 transition">Send</button>
+                <button type="button" onclick="closeCompose()" class="text-slate-500">Cancel</button>
+                <button type="submit" class="bg-blue-600 px-10 py-3 rounded-xl font-bold">Send</button>
             </div>
         </form>
     </div>
 
     <script>
         let myEmail = localStorage.getItem('farmail_session');
-        let currentMessages = [];
+        let inbox = [];
 
-        if (myEmail) startApp(myEmail);
+        if (myEmail) start(myEmail);
 
-        async function auth(mode) {
-            const user = document.getElementById('u-name').value;
+        async function auth(type) {
+            const user = document.getElementById('u-user').value;
             const pass = document.getElementById('u-pass').value;
-            const res = await fetch(`/auth/${mode}`, {
+            const res = await fetch(`/auth/${type}`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ user, pass })
             });
             const data = await res.json();
             if (data.success) {
-                if (mode === 'signup') notify("Account Created! You can now login.");
-                else { localStorage.setItem('farmail_session', data.email); startApp(data.email); }
+                if (type === 'signup') notify("Account Created!");
+                else { localStorage.setItem('farmail_session', data.email); start(data.email); }
             } else notify(data.error);
         }
 
-        function startApp(email) {
+        function start(email) {
             myEmail = email;
             document.getElementById('auth-ui').classList.add('hidden');
             document.getElementById('app-ui').classList.remove('hidden');
-            document.getElementById('current-user').innerText = email;
+            document.getElementById('user-tag').innerText = email;
             sync();
-            setInterval(sync, 4000); // Check for new mail every 4s
+            setInterval(sync, 3000); 
         }
 
         async function sync() {
             const res = await fetch(`/api/messages/${myEmail}`);
-            currentMessages = await res.json();
-            const list = document.getElementById('msg-list');
-            list.innerHTML = currentMessages.map(m => `
-                <div onclick="view('${m.id}')" class="msg-card p-6 rounded-2xl border border-slate-800 cursor-pointer ${m.read ? 'opacity-60' : 'unread'}">
-                    <div class="flex justify-between items-center mb-1">
-                        <span class="text-blue-400 text-[10px] font-bold tracking-widest uppercase">${m.sender}</span>
+            inbox = await res.json();
+            const box = document.getElementById('msg-container');
+            box.innerHTML = inbox.map(m => `
+                <div onclick="openView('${m.id}')" class="p-6 rounded-2xl border border-slate-800 cursor-pointer bg-slate-900/30 hover:bg-slate-900 transition ${!m.read ? 'unread-indicator shadow-lg shadow-blue-500/5' : 'opacity-60'}">
+                    <div class="flex justify-between mb-1">
+                        <span class="text-blue-500 text-[10px] font-bold uppercase tracking-widest">${m.sender}</span>
                         ${!m.read ? '<span class="w-2 h-2 bg-blue-500 rounded-full"></span>' : ''}
                     </div>
                     <h4 class="font-bold text-lg">${m.subject}</h4>
                     <p class="text-slate-500 text-sm line-clamp-1">${m.body}</p>
                 </div>
-            `).join('') || '<div class="text-center text-slate-700 py-20">No mail found</div>';
+            `).join('') || '<div class="text-center py-20 text-slate-700">Inbox empty</div>';
         }
 
-        async function view(id) {
-            const m = currentMessages.find(msg => msg.id === id);
+        async function openView(id) {
+            const m = inbox.find(x => x.id === id);
             if (!m) return;
-            if(!m.read) fetch(`/api/read/${id}`, {method:'POST'});
+            if (!m.read) fetch(`/api/read/${id}`, {method:'POST'});
             
-            const content = document.getElementById('v-content');
-            content.innerHTML = `
-                <p class="text-blue-500 font-mono text-xs mb-2">From: ${m.sender}</p>
-                <h2 class="text-3xl font-bold mb-8">${m.subject}</h2>
-                <div class="bg-black/50 p-8 rounded-2xl border border-slate-800 text-slate-300 leading-relaxed whitespace-pre-wrap mb-8">${m.body}</div>
-                ${m.file_url ? `<a href="${m.file_url}" target="_blank" class="bg-blue-600/10 text-blue-400 p-4 rounded-xl border border-blue-500/20 inline-block font-bold">📎 Download: ${m.file_name}</a>` : ''}
+            document.getElementById('v-body').innerHTML = `
+                <p class="text-blue-500 text-xs font-mono mb-2">${m.sender}</p>
+                <h2 class="text-3xl font-bold mb-6">${m.subject}</h2>
+                <div class="bg-black/40 p-6 rounded-2xl border border-slate-800 text-slate-300 whitespace-pre-wrap">${m.body}</div>
+                ${m.file_url ? `<a href="${m.file_url}" target="_blank" class="mt-6 inline-block text-blue-400 text-sm font-bold border border-blue-400/20 p-3 rounded-lg bg-blue-400/5">📎 View Attachment</a>` : ''}
             `;
             document.getElementById('v-modal').classList.remove('hidden');
             sync();
         }
 
-        document.getElementById('compose-form').onsubmit = async (e) => {
+        document.getElementById('c-form').onsubmit = async (e) => {
             e.preventDefault();
             const fd = new FormData(e.target);
             fd.append('sender', myEmail);
             const res = await fetch('/api/send', { method: 'POST', body: fd });
-            if (res.ok) {
-                notify("Sent Successfully");
-                document.getElementById('c-modal').classList.add('hidden');
-                e.target.reset();
-                sync();
-            }
+            if (res.ok) { notify("Message Sent!"); closeCompose(); e.target.reset(); sync(); }
         };
 
-        function notify(msg) {
-            const t = document.getElementById('toast');
-            t.innerText = msg; t.classList.remove('hidden');
-            setTimeout(() => t.classList.add('hidden'), 3000);
+        function notify(t) {
+            const n = document.getElementById('notif');
+            n.innerText = t; n.classList.remove('hidden');
+            setTimeout(() => n.classList.add('hidden'), 3000);
         }
+        function openCompose() { document.getElementById('c-modal').classList.remove('hidden'); }
+        function closeCompose() { document.getElementById('c-modal').classList.add('hidden'); }
+        function closeView() { document.getElementById('v-modal').classList.add('hidden'); }
         function logout() { localStorage.removeItem('farmail_session'); location.reload(); }
     </script>
 </body>
