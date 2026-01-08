@@ -2,33 +2,30 @@ import os
 import uuid
 import json
 import requests
-from flask import Flask, render_template, request, jsonify, session
+from flask import Flask, render_template, request, jsonify
 from vercel_blob import put, list_blobs
 
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "farmail_default_key_123")
+app.secret_key = os.getenv("SECRET_KEY", "farmail_cloud_key_99")
 
 DB_FILENAME = "farmail_db.json"
 
 def get_db():
-    """Retrieves the database JSON from Vercel Blob storage."""
     try:
-        all_blobs = list_blobs()
-        # Find the database file in the list of blobs
-        target_blob = next((b for b in all_blobs.get('blobs', []) if b['pathname'] == DB_FILENAME), None)
+        # Fetch list of blobs to find the DB URL
+        blobs_data = list_blobs()
+        target = next((b for b in blobs_data.get('blobs', []) if b['pathname'] == DB_FILENAME), None)
         
-        if target_blob:
-            response = requests.get(target_blob['url'])
+        if target:
+            response = requests.get(target['url'])
             return response.json()
         return {"users": {}, "messages": []}
     except Exception:
         return {"users": {}, "messages": []}
 
 def save_db(data):
-    """Saves the database JSON back to Vercel Blob."""
-    json_data = json.dumps(data)
-    # add_random_suffix=False ensures we overwrite the same file
-    put(DB_FILENAME, json_data, {"contentType": "application/json", "addRandomSuffix": "false"})
+    # 'add_random_suffix': 'false' is critical to keep the filename consistent
+    put(DB_FILENAME, json.dumps(data), {"contentType": "application/json", "addRandomSuffix": "false"})
 
 @app.route('/')
 def index():
@@ -38,20 +35,20 @@ def index():
 def handle_auth(mode):
     db = get_db()
     data = request.json
-    username = data.get('user').lower().strip()
-    password = data.get('pass')
-    email = f"{username}@farmail.com" if "@farmail.com" not in username else username
+    user_input = data.get('user').lower().strip()
+    pwd = data.get('pass')
+    email = f"{user_input}@farmail.com" if "@" not in user_input else user_input
 
     if mode == 'signup':
         if email in db['users']:
-            return jsonify({"success": False, "error": "Username taken"}), 400
-        db['users'][email] = {"password": password}
+            return jsonify({"success": False, "error": "Email taken"}), 400
+        db['users'][email] = {"password": pwd}
         save_db(db)
         return jsonify({"success": True, "email": email})
     else:
-        if email in db['users'] and db['users'][email]['password'] == password:
+        if email in db['users'] and db['users'][email]['password'] == pwd:
             return jsonify({"success": True, "email": email})
-        return jsonify({"success": False, "error": "Invalid credentials"}), 401
+        return jsonify({"success": False, "error": "Login failed"}), 401
 
 @app.route('/api/send', methods=['POST'])
 def send_email():
@@ -61,15 +58,12 @@ def send_email():
     subject = request.form.get('subject')
     body = request.form.get('body')
     
-    file_url = None
-    file_name = None
-    
+    file_url, file_name = None, None
     if 'file' in request.files:
-        file = request.files['file']
-        if file.filename != '':
-            file_name = file.filename
-            # Upload attachment to Blob
-            blob = put(f"attachments/{uuid.uuid4()}-{file_name}", file.read(), {"access": "public"})
+        f = request.files['file']
+        if f.filename != '':
+            file_name = f.filename
+            blob = put(f"uploads/{uuid.uuid4()}-{file_name}", f.read(), {"access": "public"})
             file_url = blob['url']
 
     db['messages'].append({
@@ -92,7 +86,7 @@ def get_messages(email):
     return jsonify(user_msgs[::-1])
 
 @app.route('/api/read/<msg_id>', methods=['POST'])
-def mark_as_read(msg_id):
+def mark_read(msg_id):
     db = get_db()
     for m in db['messages']:
         if m['id'] == msg_id:
@@ -101,8 +95,5 @@ def mark_as_read(msg_id):
     save_db(db)
     return jsonify({"success": True})
 
-# This line is essential for Vercel to find your app
-app = app 
-
-if __name__ == '__main__':
-    app.run()
+# This is required for Vercel to recognize the app object
+app = app
