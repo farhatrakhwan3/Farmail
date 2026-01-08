@@ -101,5 +101,8 @@ def mark_as_read(msg_id):
     save_db(db)
     return jsonify({"success": True})
 
-# Required for Vercel
-app.debug = False
+# This line is essential for Vercel to find your app
+app = app 
+
+if __name__ == '__main__':
+    app.run()
